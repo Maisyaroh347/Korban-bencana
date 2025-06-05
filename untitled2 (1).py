@@ -15,6 +15,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
+# ✅ Tambahkan ini!
+try:
+    df = pd.read_csv("Korban_bencana.csv", sep=";", engine="python")
+except FileNotFoundError:
+    st.error("❌ File 'Korban_bencana.csv' tidak ditemukan.")
+    st.stop()
+except Exception as e:
+    st.error(f"❌ Gagal membaca file CSV: {e}")
+    st.stop()
+
+# ... lanjut ke definisi fungsi ...
+
+
 # Load the data (assuming the df is already loaded from the preceding code)
 # If not, you would need to add the data loading code here.
 # Example:
