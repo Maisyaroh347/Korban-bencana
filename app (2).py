@@ -2,26 +2,32 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import os
 
-# ==== Load Dataset ====
+# ==== Load atau Upload Dataset ====
 @st.cache_data
 def load_data():
     return pd.read_csv("Korban_bencana.csv", sep=";", engine="python")
 
-try:
+# Cek apakah file lokal tersedia
+if not os.path.exists("Korban_bencana.csv"):
+    st.warning("File 'Korban_bencana.csv' tidak ditemukan. Silakan unggah file CSV.")
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file, sep=";", engine="python")
+        df.to_csv("Korban_bencana.csv", index=False)
+    else:
+        st.stop()
+else:
     df = load_data()
-except FileNotFoundError:
-    st.error("❌ Dataset tidak ditemukan. Pastikan file 'Korban_bencana.csv' tersedia.")
-    st.stop()
 
 # ==== Halaman 1: Dataset & Visualisasi ====
 def page_dataset():
-    st.title("Dataset dan Visualisasi Korban Bencana")
+    st.title("📊 Dataset & Visualisasi Korban Bencana")
 
     st.subheader("Cuplikan Data")
     st.dataframe(df.head())
@@ -32,20 +38,26 @@ def page_dataset():
     st.subheader("Tipe Data")
     st.write(df.dtypes)
 
-    st.subheader("Distribusi Total Deaths")
-    fig, ax = plt.subplots()
-    sns.histplot(df["Total Deaths"].fillna(0), kde=True, ax=ax)
-    st.pyplot(fig)
+    if "Total Deaths" in df.columns:
+        st.subheader("Distribusi Total Deaths")
+        fig, ax = plt.subplots()
+        sns.histplot(df["Total Deaths"].fillna(0), kde=True, ax=ax)
+        st.pyplot(fig)
+    else:
+        st.warning("Kolom 'Total Deaths' tidak ditemukan.")
 
     st.subheader("Korelasi Fitur Numerik")
     num_cols = df.select_dtypes(include="number").columns
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
-    sns.heatmap(df[num_cols].corr(), annot=True, cmap="coolwarm", ax=ax2)
-    st.pyplot(fig2)
+    if len(num_cols) > 1:
+        fig2, ax2 = plt.subplots(figsize=(10, 6))
+        sns.heatmap(df[num_cols].corr(), annot=True, cmap="coolwarm", ax=ax2)
+        st.pyplot(fig2)
+    else:
+        st.warning("Tidak cukup fitur numerik untuk ditampilkan.")
 
 # ==== Halaman 2: Pelatihan Model ====
 def page_training():
-    st.title("Pelatihan Model Prediksi Jumlah Korban Jiwa")
+    st.title("🧠 Pelatihan Model Prediksi Total Deaths")
 
     if "Total Deaths" not in df.columns:
         st.error("Kolom 'Total Deaths' tidak ditemukan dalam dataset.")
@@ -56,7 +68,7 @@ def page_training():
     y = df_clean["Total Deaths"]
 
     if X.empty or y.empty:
-        st.warning("Data kosong setelah dibersihkan.")
+        st.warning("Data kosong atau tidak ada fitur numerik.")
         return
 
     if st.button("Latih Model"):
@@ -73,23 +85,27 @@ def page_training():
         st.write(f"📉 Mean Absolute Error: {mae:.2f}")
         st.write(f"📈 R² Score: {r2:.2f}")
 
-        # Simpan model
+        # Simpan model & fitur
         joblib.dump(model, "model_rf.pkl")
         joblib.dump(X.columns.tolist(), "model_columns.pkl")
-        st.success("Model dan fitur disimpan sebagai 'model_rf.pkl' dan 'model_columns.pkl'.")
+        st.info("Model disimpan sebagai `model_rf.pkl` dan daftar kolom sebagai `model_columns.pkl`.")
 
-# ==== Halaman 3: Formulir Prediksi ====
+# ==== Halaman 3: Prediksi ====
 def page_prediction():
-    st.title("Formulir Prediksi Jumlah Korban Jiwa")
+    st.title("📝 Formulir Prediksi Jumlah Korban Jiwa")
 
     if not (os.path.exists("model_rf.pkl") and os.path.exists("model_columns.pkl")):
-        st.warning("Model belum tersedia. Silakan latih model terlebih dahulu.")
+        st.warning("Model belum tersedia. Silakan latih terlebih dahulu.")
         return
 
     model = joblib.load("model_rf.pkl")
     features = joblib.load("model_columns.pkl")
 
-    st.write("Silakan isi data berikut:")
+    if not features:
+        st.error("Daftar fitur kosong. Silakan latih model terlebih dahulu.")
+        return
+
+    st.write("Masukkan nilai untuk setiap fitur di bawah ini:")
 
     input_data = {}
     for feature in features:
@@ -98,18 +114,18 @@ def page_prediction():
     if st.button("Prediksi"):
         df_input = pd.DataFrame([input_data])
         prediction = model.predict(df_input)[0]
-        st.subheader("Hasil Prediksi")
+        st.subheader("🔮 Hasil Prediksi")
         st.success(f"Prediksi Total Deaths: {prediction:.2f}")
 
 # ==== Navigasi ====
-st.sidebar.title("Navigasi")
+st.sidebar.title("📂 Navigasi")
 page = st.sidebar.radio("Pilih Halaman", [
-    "Dataset dan Visualisasi",
+    "Dataset & Visualisasi",
     "Pelatihan Model",
     "Formulir Prediksi"
 ])
 
-if page == "Dataset dan Visualisasi":
+if page == "Dataset & Visualisasi":
     page_dataset()
 elif page == "Pelatihan Model":
     page_training()
